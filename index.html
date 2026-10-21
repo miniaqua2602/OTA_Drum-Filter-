@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" charset="UTF-8">
+<title>ST DRUM FILTER - V18.3</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+  body { background-color: #0d1117; color: #e6edf3; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 12px; }
+  .header { text-align: center; margin-bottom: 12px; padding: 10px; background: linear-gradient(135deg, #161b22, #0d1117); border: 1px solid #30363d; border-radius: 12px; }
+  .header h2 { color: #58a6ff; margin: 0; font-size: 19px; letter-spacing: 1px; }
+  .id-badge { display: inline-block; background: #238636; color: #fff; font-weight: bold; font-size: 12px; padding: 3px 10px; border-radius: 20px; margin-top: 4px; }
+  .net-banner { margin-top: 8px; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: bold; text-align: center; background: #1f6feb; color: #fff; transition: 0.3s; cursor: pointer; }
+  .status-bar { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; margin-top: 8px; padding-top: 8px; border-top: 1px solid #21262d; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .sensor-container { display: flex; justify-content: space-between; text-align: center; margin-top: 6px; }
+  .sensor-col { flex: 1; }
+  .s-title { font-size: 11px; color: #8b949e; font-weight: bold; margin-bottom: 8px; display: block; }
+  .s-bar-bg { width: 36px; height: 70px; background: #0d1117; border: 2px solid #30363d; border-radius: 6px; margin: 0 auto 8px auto; position: relative; overflow: hidden; }
+  .s-fill { position: absolute; bottom: 0; left: 0; width: 100%; transition: height 0.3s, background 0.3s; }
+  .s-status { font-size: 10px; font-weight: bold; }
+  @keyframes blinkError { 0% { background-color: #da3633; box-shadow: 0 0 15px #f85149; } 50% { background-color: #490d10; box-shadow: none; } 100% { background-color: #da3633; box-shadow: 0 0 15px #f85149; } }
+  .error-blink { animation: blinkError 0.6s infinite !important; }
+  @keyframes pulseRun { 0% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(63, 185, 80, 0); } 100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); } }
+  .running-pulse { animation: pulseRun 1.2s infinite; }
+  .overview-title { text-align: center; font-size: 12px; font-weight: bold; color: #58a6ff; padding-bottom: 10px; border-bottom: 1px solid #21262d; margin-bottom: 12px; letter-spacing: 0.5px; }
+  .ov-flex { display: flex; justify-content: space-between; align-items: center; }
+  .ov-text-green { color: #3fb950; font-weight: bold; font-size: 14px; margin: 0 0 5px 0;}
+  .ov-text-grey { color: #8b949e; font-size: 12px; margin: 0;}
+  .ov-count { color: #d29922; font-size: 24px; font-weight: bold; margin: 0;}
+  .icon-circle { width: 44px; height: 44px; border-radius: 50%; background: #3fb950; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #000; }
+  .btn-sm { background: #21262d; color: #fff; border: 1px solid #30363d; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 14px; font-weight: bold; }
+  .btn-sm:active, .btn:active { transform: scale(0.96); opacity: 0.85; }
+  .log-box { max-height: 150px; overflow-y: auto; padding-right: 5px; }
+  .log-row { display: flex; justify-content: space-between; font-size: 12px; color: #c9d1d9; padding: 7px 0; border-bottom: 1px solid #21262d; }
+  .btn { display: block; width: 100%; padding: 13px; margin-bottom: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; text-align: center; cursor: pointer; border: none; transition: 0.2s; }
+  .btn-mode { background: #1f6feb; color: #fff; }
+  .btn-manual { background: #238636; color: #fff; }
+  .btn-bypass { background: #9e6a03; color: #fff; }
+  .btn-scan { background: #8957e5; color: #fff; }
+  .btn-reset { background: transparent; border: 1px solid #f85149; color: #f85149; }
+  .app-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .app-box { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 10px; text-align: center; }
+  .app-val { font-size: 17px; font-weight: bold; color: #58a6ff; margin: 5px 0; }
+  .input-wifi { width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 8px; background: #0d1117; border: 1px solid #30363d; color: #fff; border-radius: 6px; font-size: 13px; }
+  .warn-banner { display: none; background: #da3633; color: #fff; padding: 12px; border-radius: 8px; margin-bottom: 12px; text-align: center; font-weight: bold; font-size: 13px; border: 1px solid #ff7b72; }
+  .remind-banner { display: none; background: #1f2937; color: #58a6ff; padding: 10px; border-radius: 8px; margin-bottom: 12px; text-align: center; font-size: 12px; border: 1px solid #388bfd; }
+  .wifi-msg { padding: 8px; border-radius: 6px; background: #0d1117; border: 1px solid #30363d; font-size: 12px; color: #d29922; margin-bottom: 10px; text-align: center; }
+</style>
+<script>
+  var pausePolling = false;
+  var mqttClient = null;
+  var devId = "MA-9059";
+  var useMqttFallback = false;
+  var curData = { t1: 20, t3: 20, t3off: 30, mode: 0, byp: 0, rk1: 0, rk3: 0 };
+  var lockUntil = 0;
+  var localRk1 = 0;
+  var localRk3 = 0;
+
+  var fmtMin = (sec) => {
+    var s = parseInt(sec) || 0;
+    if (s <= 0) return "0 phút";
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    if (m === 0) return r + "s (0." + Math.round((r / 60) * 10) + "p)";
+    return m + "p " + r + "s";
+  };
+
+  var updateCountdownUI = () => {
+    var btnMan = document.getElementById('btn_man');
+    var sttEl = document.getElementById('ov_stt');
+    var icEl = document.getElementById('ov_icon');
+    var maxRem = Math.max(localRk1, localRk3);
+
+    if (maxRem > 0) {
+      sttEl.innerText = '🟢 ĐANG CHẠY: K1 (' + localRk1 + 's) | K3 (' + localRk3 + 's)';
+      sttEl.style.color = '#3fb950';
+      icEl.style.background = '#3fb950';
+      icEl.className = 'icon-circle running-pulse';
+      btnMan.innerText = '⏳ ĐANG XỊT RỬA... CÒN ' + maxRem + ' GIÂY';
+      btnMan.style.background = '#d29922';
+      btnMan.style.color = '#000';
+    } else {
+      sttEl.innerText = 'HỆ THỐNG ĐANG CHỜ';
+      sttEl.style.color = '#8b949e';
+      icEl.style.background = '#30363d';
+      icEl.className = 'icon-circle';
+      btnMan.innerText = '💦 KÍCH XỊT RỬA K3 (XỊT LỒNG) NGAY';
+      btnMan.style.background = '#238636';
+      btnMan.style.color = '#fff';
+    }
+  };
+
+  setInterval(() => {
+    if (localRk1 > 0 || localRk3 > 0) {
+      if (localRk1 > 0) localRk1--;
+      if (localRk3 > 0) localRk3--;
+      updateCountdownUI();
+    }
+  }, 1000);
+
+  var renderUI = (d) => {
+    curData = d;
+    if (d.id) devId = d.id;
+    document.getElementById('dev_id').innerText = 'MÃ MÁY: ' + devId + ' | 🕒 ' + d.clk;
+    
+    var nb = document.getElementById('net_banner');
+    if (useMqttFallback) {
+      nb.style.background = '#238636';
+      nb.innerText = '🚀 ĐÃ TỰ ĐỘNG CHUYỂN SANG CHẾ ĐỘ 4G CLOUD!';
+    } else {
+      nb.style.background = '#1f6feb';
+      nb.innerText = '📶 ĐANG DÙNG WI-FI NỘI BỘ (Tắt Wi-Fi sẽ tự chuyển sang 4G)';
+    }
+
+    if (Date.now() > lockUntil) {
+      localRk1 = parseInt(d.rk1) || 0;
+      localRk3 = parseInt(d.rk3) || 0;
+      if (d.k1_run && localRk1 === 0) localRk1 = d.t1;
+      if (d.k3_run && localRk3 === 0) localRk3 = d.t3;
+      updateCountdownUI();
+    }
+
+    var s1_ngap = (d.s1 == 0); 
+    if (localRk1 > 0) {
+      document.getElementById('s1_fill').style.height = '75%';
+      document.getElementById('s1_fill').style.background = '#3fb950';
+      document.getElementById('s1_txt').innerText = 'ĐANG BƠM (' + localRk1 + 's)';
+      document.getElementById('s1_txt').style.color = '#3fb950';
+    } else {
+      document.getElementById('s1_fill').style.height = s1_ngap ? '100%' : '15%';
+      document.getElementById('s1_fill').style.background = s1_ngap ? '#58a6ff' : '#30363d';
+      document.getElementById('s1_txt').innerText = s1_ngap ? 'NGẬP SẴN SÀNG' : 'CẠN (CHỜ)';
+      document.getElementById('s1_txt').style.color = s1_ngap ? '#58a6ff' : '#8b949e';
+    }
+
+    var k3_ngap = (d.s2 == 0); 
+    var s2h = '15%'; var s2c = '#30363d'; var s2t = 'CẠN LỒNG (CHỜ XẢ)';
+    if (localRk3 > 0 || d.k3_run) { 
+      s2h = '65%'; s2c = '#d29922'; s2t = 'ĐANG XỊT (' + localRk3 + 's)'; 
+    } else if (k3_ngap) { 
+      s2h = '100%'; s2c = '#58a6ff'; s2t = 'NGẬP LỒNG (SẠCH)'; 
+    }
+    document.getElementById('s2_fill').style.height = s2h;
+    document.getElementById('s2_fill').style.background = s2c;
+    document.getElementById('s2_txt').innerText = s2t;
+    document.getElementById('s2_txt').style.color = s2c;
+
+    var k2_safe = (d.s3 == 0); 
+    var s3_bar = document.getElementById('s3_fill');
+    if (d.byp == 1) {
+      s3_bar.className = 's-fill'; s3_bar.style.height = '100%'; s3_bar.style.background = '#d29922'; 
+      document.getElementById('s3_txt').innerText = 'ĐANG BỎ QUA K2'; document.getElementById('s3_txt').style.color = '#d29922';
+    } else if (k2_safe) {
+      s3_bar.className = 's-fill'; s3_bar.style.height = '100%'; s3_bar.style.background = '#3fb950'; 
+      document.getElementById('s3_txt').innerText = 'AN TOÀN (NGẬP)'; document.getElementById('s3_txt').style.color = '#3fb950';
+    } else {
+      s3_bar.className = 's-fill error-blink'; s3_bar.style.height = '100%'; s3_bar.style.background = ''; 
+      document.getElementById('s3_txt').innerText = 'BÁO CẠN K2!'; document.getElementById('s3_txt').style.color = '#f85149';
+    }
+
+    var warnBox = document.getElementById('warn_box');
+    if (d.k2_24h > 20) {
+      warnBox.style.display = 'block';
+      warnBox.className = 'warn-banner error-blink';
+      warnBox.innerText = '🚨 WARNING: DRUM BẨN CẦN VỆ SINH! (K2 đã báo cạn ' + d.k2_24h + ' lần trong 24h)';
+    } else if (!k2_safe && d.byp == 0) {
+      warnBox.style.display = 'block';
+      warnBox.className = 'warn-banner';
+      warnBox.innerText = '⚠️ CẢNH BÁO: Hụt nước K2! Đã ngắt bảo vệ bơm (Có thể bấm nút Bỏ qua K2 bên dưới để chạy tạm).';
+    } else {
+      warnBox.style.display = 'none';
+    }
+
+    var remBox = document.getElementById('remind_box');
+    if (d.w_24h > 300) {
+      remBox.style.display = 'block';
+      remBox.innerText = '💡 Nhắc nhở: Drum hôm nay chạy quá 300 lần/24h (Hiện tại: ' + d.w_24h + ' lần)';
+    } else {
+      remBox.style.display = 'none';
+    }
+
+    if (Date.now() > lockUntil) {
+      document.getElementById('ov_cnt').innerText = d.cnt;
+      document.getElementById('btn_mode').innerText = d.mode == 0 ? '🔄 CHẾ ĐỘ K3: AUTO CẢM BIẾN' : '🔄 CHẾ ĐỘ K3: TIMER LUÂN PHIÊN';
+      document.getElementById('btn_byp').innerText = (d.byp == 1) ? '🛡️ ĐANG BỎ QUA K2 (BẤM ĐỂ BẬT LẠI BẢO VỆ)' : '🛠️ BỎ QUA BẢO VỆ K2 (CHẠY TẠM KHI LỖI QUE ĐO)';
+      document.getElementById('btn_byp').style.background = (d.byp == 1) ? '#da3633' : '#9e6a03';
+      document.getElementById('t1').innerText = d.t1;
+      document.getElementById('t3').innerText = d.t3;
+      document.getElementById('t3off').innerText = d.t3off;
+    }
+
+    document.getElementById('w24_val').innerText = d.w_24h + ' / 300';
+    document.getElementById('k2_24_val').innerText = d.k2_24h + ' / 20';
+    document.getElementById('avg_int').innerText = fmtMin(d.avg_t);
+    document.getElementById('rem_24h').innerText = d.rem_t;
+    
+    document.getElementById('sys_ip').innerText = useMqttFallback ? '☁️ KẾT NỐI: 4G CLOUD' : d.ip;
+    document.getElementById('sys_up').innerText = d.wf_stt;
+    document.getElementById('wifi_box_msg').innerText = 'Trạng thái: ' + d.wf_stt + ' (' + d.ip + ')';
+
+    var lh = '';
+    d.logs.forEach(lg => { 
+      var m = Math.floor(lg.t / 60);
+      var s = lg.t % 60;
+      var tStr = (m > 0) ? (m + 'p ' + s + 's') : (s + 's');
+      lh += `<div class="log-row"><span>Lần #${lg.n} [${lg.tm}]</span><span>Cách trước: ${tStr}</span></div>`; 
+    });
+    document.getElementById('log_box').innerHTML = lh;
+  };
+
+  var startMqtt4G = () => {
+    useMqttFallback = true;
+    var nb = document.getElementById('net_banner');
+    if (!mqttClient) {
+      nb.style.background = '#d29922';
+      nb.innerText = '⏳ ĐANG KẾT NỐI ĐƯỜNG TRUYỀN 4G CLOUD...';
+      var brokerUrl = (window.location.protocol === 'https:') ? 'wss://broker.emqx.io:8084/mqtt' : 'ws://broker.emqx.io:8083/mqtt';
+      mqttClient = mqtt.connect(brokerUrl, { keepalive: 30, reconnectPeriod: 2000 });
+      mqttClient.on('connect', () => {
+        nb.style.background = '#238636';
+        nb.innerText = '🚀 ĐÃ TỰ ĐỘNG CHUYỂN SANG CHẾ ĐỘ 4G CLOUD!';
+        document.getElementById('sys_ip').innerText = '☁️ KẾT NỐI: 4G CLOUD';
+        mqttClient.subscribe("miniaqua/drum/" + devId + "/state");
+      });
+      mqttClient.on('message', (topic, msg) => {
+        renderUI(JSON.parse(msg.toString()));
+      });
+    } else {
+      nb.style.background = '#238636';
+      nb.innerText = '🚀 ĐÃ TỰ ĐỘNG CHUYỂN SANG CHẾ ĐỘ 4G CLOUD!';
+    }
+  };
+
+  var loadData = () => {
+    if (pausePolling || useMqttFallback) return;
+    var ctrl = new AbortController();
+    var tid = setTimeout(() => ctrl.abort(), 1600);
+    fetch('/data', { signal: ctrl.signal }).then(r => r.json()).then(d => {
+      clearTimeout(tid);
+      renderUI(d);
+    }).catch(e => {
+      clearTimeout(tid);
+      startMqtt4G();
+    });
+  };
+  
+  setInterval(loadData, 1200);
+
+  var sendBtn = (id) => { 
+    if (id == 100) {
+      if (!confirm('Bạn có chắc chắn muốn cập nhật phần mềm mới từ GitHub không?')) return;
+    }
+    lockUntil = Date.now() + 3000;
+    lockUntil = Date.now() + 3000;
+    if (id == 1) {
+      localRk3 = curData.t3 || 20;
+      updateCountdownUI();
+    }
+    if (id == 5) {
+      curData.mode = curData.mode == 0 ? 1 : 0;
+      document.getElementById('btn_mode').innerText = curData.mode == 0 ? '🔄 CHẾ ĐỘ K3: AUTO CẢM BIẾN' : '🔄 CHẾ ĐỘ K3: TIMER LUÂN PHIÊN';
+    }
+    if (id == 8) {
+      curData.byp = curData.byp == 1 ? 0 : 1;
+      document.getElementById('btn_byp').innerText = (curData.byp == 1) ? '🛡️ ĐANG BỎ QUA K2 (BẤM ĐỂ BẬT LẠI BẢO VỆ)' : '🛠️ BỎ QUA BẢO VỆ K2 (CHẠY TẠM KHI LỖI QUE ĐO)';
+      document.getElementById('btn_byp').style.background = (curData.byp == 1) ? '#da3633' : '#9e6a03';
+    }
+    if (id == 21 && curData.t1 > 5) { curData.t1--; document.getElementById('t1').innerText = curData.t1; }
+    if (id == 22) { curData.t1++; document.getElementById('t1').innerText = curData.t1; }
+    if (id == 23 && curData.t3 > 5) { curData.t3--; document.getElementById('t3').innerText = curData.t3; }
+    if (id == 24) { curData.t3++; document.getElementById('t3').innerText = curData.t3; }
+    if (id == 25 && curData.t3off > 1) { curData.t3off--; document.getElementById('t3off').innerText = curData.t3off; }
+    if (id == 26) { curData.t3off++; document.getElementById('t3off').innerText = curData.t3off; }
+
+    if (useMqttFallback && mqttClient) {
+      mqttClient.publish("miniaqua/drum/" + devId + "/cmd", String(id), { qos: 1 });
+    } else {
+      fetch('/btn?id=' + id).then(() => loadData()).catch(() => {
+        startMqtt4G();
+        setTimeout(() => {
+          if (mqttClient) mqttClient.publish("miniaqua/drum/" + devId + "/cmd", String(id), { qos: 1 });
+        }, 400);
+      });
+    }
+  };
+
+  var scanWifi = () => {
+    pausePolling = true;
+    var msgEl = document.getElementById('wifi_box_msg');
+    msgEl.style.color = '#58a6ff';
+    msgEl.innerText = '🔍 Đang quét sóng Wi-Fi 2.4GHz quanh tủ điện (đợi 4 giây)...';
+    fetch('/scan').then(r => r.json()).then(list => {
+      pausePolling = false;
+      var sel = document.getElementById('wifi_select');
+      sel.style.display = 'block';
+      sel.innerHTML = '<option value="">-- Chạm vào đây để chọn Wi-Fi nhà bạn --</option>';
+      if (list.length === 0) {
+        msgEl.style.color = '#f85149';
+        msgEl.innerText = '❌ Không tìm thấy mạng Wi-Fi 2.4GHz nào quanh đây!';
+      } else {
+        msgEl.style.color = '#3fb950';
+        msgEl.innerText = '✅ Tìm thấy ' + list.length + ' mạng Wi-Fi! Hãy chọn ở khung dưới:';
+        list.forEach(item => {
+          var opt = document.createElement('option');
+          opt.value = item.ssid;
+          opt.innerText = item.ssid + ' (Sóng: ' + item.rssi + ' dBm)';
+          sel.appendChild(opt);
+        });
+      }
+    }).catch(e => {
+      pausePolling = false;
+      msgEl.innerText = 'Lỗi khi quét, vui lòng bấm quét lại!';
+    });
+  };
+
+  var pickWifi = (val) => { if (val) document.getElementById('ssid').value = val; };
+
+  var saveWifi = () => {
+    var s = document.getElementById('ssid').value.trim();
+    var p = document.getElementById('pass').value.trim();
+    var msgEl = document.getElementById('wifi_box_msg');
+    if(!s) { msgEl.style.color = '#f85149'; msgEl.innerText = '⚠ Bạn chưa chọn hoặc nhập tên Wi-Fi!'; return; }
+    pausePolling = true;
+    fetch('/wifi?ssid=' + encodeURIComponent(s) + '&pass=' + encodeURIComponent(p));
+    var sec = 15;
+    msgEl.style.color = '#d29922';
+    var timer = setInterval(() => {
+      msgEl.innerText = '⏳ Đang kết nối vào [' + s + ']... (' + sec + 's)';
+      sec--;
+      if (sec < 0) { clearInterval(timer); pausePolling = false; loadData(); }
+    }, 1000);
+  };
+
+  var clearWifi = () => {
+    fetch('/clearwifi').then(r => r.text()).then(msg => {
+      document.getElementById('wifi_box_msg').innerText = msg;
+      loadData();
+    });
+  };
+</script>
+</head><body onload="loadData()">
+<div class="header">
+  <h2>ST_DRUM_FILTER (V18.3)</h2>
+  <div class="id-badge" id="dev_id">MÃ MÁY: ĐANG TẢI...</div>
+  <div id="net_banner" class="net-banner" onclick="startMqtt4G()">📶 ĐANG DÙNG WI-FI NỘI BỘ (Tắt Wi-Fi sẽ tự chuyển sang 4G)</div>
+  <div class="status-bar">
+    <span id="sys_ip">AP: 192.168.4.1</span>
+    <span id="sys_up">Chế độ AP</span>
+  </div>
+</div>
+
+<div id="warn_box" class="warn-banner"></div>
+<div id="remind_box" class="remind-banner"></div>
+
+<div class="card"><div class="sensor-container">
+  <div class="sensor-col"><span class="s-title">S1 (Bơm K1)</span><div class="s-bar-bg"><div id="s1_fill" class="s-fill" style="height: 15%; background: #30363d;"></div></div><span class="s-status" id="s1_txt" style="color: #8b949e;">CẠN (CHỜ)</span></div>
+  <div class="sensor-col"><span class="s-title">S2 (Lồng K3)</span><div class="s-bar-bg"><div id="s2_fill" class="s-fill" style="height: 15%; background: #30363d;"></div></div><span class="s-status" id="s2_txt" style="color: #8b949e;">CẠN LỒNG</span></div>
+  <div class="sensor-col"><span class="s-title">S3 (Bảo vệ K2)</span><div class="s-bar-bg"><div id="s3_fill" class="s-fill" style="height: 100%; background: #3fb950;"></div></div><span class="s-status" id="s3_txt" style="color: #3fb950;">AN TOÀN</span></div>
+</div></div>
+
+<div class="card">
+  <div class="overview-title">TỔNG QUAN & ĐIỀU KHIỂN NHANH</div>
+  <div class="ov-flex" style="margin-bottom: 12px;">
+    <div><p class="ov-text-green" id="ov_stt">HỆ THỐNG ĐANG CHỜ</p><p class="ov-text-grey">Tổng số lần kích xả:</p><p class="ov-count" id="ov_cnt">0</p></div>
+    <div class="icon-circle" id="ov_icon">⚡</div>
+  </div>
+  <button class="btn btn-manual" id="btn_man" onclick="sendBtn(1)">💦 KÍCH XỊT RỬA K3 (XỊT LỒNG) NGAY</button>
+  <button class="btn btn-mode" id="btn_mode" onclick="sendBtn(5)">🔄 CHẾ ĐỘ K3: AUTO</button>
+  <button class="btn btn-bypass" id="btn_byp" onclick="sendBtn(8)">🛠️ BỎ QUA BẢO VỆ K2 (CHẠY TẠM KHI LỖI QUE ĐO)</button>
+</div>
+
+<div class="card">
+  <div class="overview-title">CÀI ĐẶT THỜI GIAN CHU KỲ</div>
+  <div class="ov-flex" style="margin-bottom:10px;"><span style="font-size:12px; font-weight:bold;">BƠM K1 CHẠY (ON):</span><div><button class="btn-sm" onclick="sendBtn(21)">➖</button><span id="t1" style="display:inline-block; width:38px; text-align:center; font-weight:bold; color:#d29922;">-</span>s <button class="btn-sm" onclick="sendBtn(22)">➕</button></div></div>
+  <div class="ov-flex" style="margin-bottom:10px;"><span style="font-size:12px; font-weight:bold;">XỊT LỒNG K3 (ON):</span><div><button class="btn-sm" onclick="sendBtn(23)">➖</button><span id="t3" style="display:inline-block; width:38px; text-align:center; font-weight:bold; color:#d29922;">-</span>s <button class="btn-sm" onclick="sendBtn(24)">➕</button></div></div>
+  <div class="ov-flex"><span style="font-size:12px; font-weight:bold;">NGHỈ LUÂN PHIÊN (OFF):</span><div><button class="btn-sm" onclick="sendBtn(25)">➖</button><span id="t3off" style="display:inline-block; width:38px; text-align:center; font-weight:bold; color:#d29922;">-</span>p <button class="btn-sm" onclick="sendBtn(26)">➕</button></div></div>
+</div>
+
+<div class="card">
+  <div class="overview-title">THEO DÕI CHU KỲ 24H & CHẨN ĐOÁN LỒNG LỌC</div>
+  <div class="app-grid">
+    <div class="app-box"><span class="ov-text-grey">Số lần xả / 24h</span><div class="app-val" id="w24_val">0 / 300</div><span style="font-size:10px; color:#8b949e;">Quá 300 lần sẽ nhắc nhở</span></div>
+    <div class="app-box"><span class="ov-text-grey">Báo cạn K2 / 24h</span><div class="app-val" id="k2_24_val" style="color:#3fb950;">0 / 20</div><span style="font-size:10px; color:#8b949e;">Quá 20 lần báo Drum bẩn</span></div>
+    <div class="app-box"><span class="ov-text-grey">TB giãn cách xả (Phút)</span><div class="app-val" id="avg_int" style="color:#d29922;">0 phút</div><span style="font-size:10px; color:#8b949e;">Độ thông thoáng lưới</span></div>
+    <div class="app-box"><span class="ov-text-grey">Reset chu kỳ 24h sau</span><div class="app-val" id="rem_24h" style="color:#c9d1d9;">24h 0p</div><button class="btn-sm" style="font-size:10px; padding:3px 8px; margin-top:2px;" onclick="sendBtn(30)">Reset 24h ngay</button></div>
+  </div>
+</div>
+
+<div class="card"><div class="overview-title">NHẬT KÝ XẢ (KÈM GIỜ THỰC TẾ)</div><div class="log-box" id="log_box"></div></div>
+
+<div class="card">
+  <div class="overview-title">KẾT NỐI WI-FI NHÀ (ĐỂ ĐỒNG BỘ GIỜ & 4G CLOUD)</div>
+  <div id="wifi_box_msg" class="wifi-msg">Bấm nút Quét bên dưới để tìm Wi-Fi nhà bạn</div>
+  <button class="btn btn-scan" onclick="scanWifi()">🔍 BƯỚC 1: QUÉT TÌM WI-FI XUNG QUANH</button>
+  <select id="wifi_select" class="input-wifi" style="display:none; color:#58a6ff; font-weight:bold;" onchange="pickWifi(this.value)"></select>
+  <input type="text" id="ssid" class="input-wifi" placeholder="Tên Wi-Fi...">
+  <input type="text" id="pass" class="input-wifi" placeholder="Mật khẩu Wi-Fi nhà...">
+  <button class="btn btn-mode" onclick="saveWifi()">💾 BƯỚC 2: LƯU & KẾT NỐI WI-FI NHÀ</button>
+  <button class="btn btn-reset" style="margin-bottom:0;" onclick="clearWifi()">❌ NGẮT & XÓA WI-FI NHÀ</button>
+</div>
+
+<button class="btn btn-mode" style="background:#6e40c9;" onclick="sendBtn(99)">🖥️ LÀM TƯƠI MÀN HÌNH TỦ ĐIỆN (KHI BỊ TRẮNG)</button>
+<button class="btn btn-mode" style="background:#8957e5;" onclick="sendBtn(100)">🚀 CẬP NHẬT PHẦN MỀM TỪ XA (OTA)</button>
+<button class="btn btn-reset" onclick="sendBtn(9)">🗑️ RESET TỔNG BỘ ĐẾM VỀ 0</button>
+</body></html>
