@@ -48,7 +48,9 @@
 <script>
   var pausePolling = false;
   var mqttClient = null;
-  var devId = "MA-9059";
+  const urlParams = new URLSearchParams(window.location.search);
+  var devId = urlParams.get('id') || localStorage.getItem('saved_device_id') || "MA-9059";
+  if (devId) { localStorage.setItem('saved_device_id', devId); }
   var useMqttFallback = false;
   var curData = { t1: 20, t3: 20, t3off: 30, mode: 0, byp: 0, rk1: 0, rk3: 0 };
   var lockUntil = 0;
@@ -99,7 +101,10 @@
 
   var renderUI = (d) => {
     curData = d;
-    if (d.id) devId = d.id;
+    if (d.id) {
+      devId = d.id;
+      localStorage.setItem('saved_device_id', devId);
+    }
     document.getElementById('dev_id').innerText = 'MÃ MÁY: ' + devId + ' | 🕒 ' + d.clk;
     
     var nb = document.getElementById('net_banner');
@@ -249,7 +254,6 @@
     if (id == 100) {
       if (!confirm('Bạn có chắc chắn muốn cập nhật phần mềm mới từ GitHub không?')) return;
     }
-    lockUntil = Date.now() + 3000;
     lockUntil = Date.now() + 3000;
     if (id == 1) {
       localRk3 = curData.t3 || 20;
