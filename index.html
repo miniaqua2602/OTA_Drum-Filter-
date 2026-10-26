@@ -219,7 +219,7 @@
       nb.style.background = '#d29922';
       nb.innerText = '⏳ ĐANG KẾT NỐI ĐƯỜNG TRUYỀN CLOUD (HIVEMQ)...';
       // Đã đồng bộ sang broker.hivemq.com qua cổng WebSocket bảo mật (wss) hoặc chuẩn ws
-      var brokerUrl = (window.location.protocol === 'https:') ? 'wss://broker.hivemq.com:8884/mqtt' : 'ws://broker.hivemq.com:8000/mqtt';
+      var brokerUrl = (window.location.protocol === 'https:') ? 'wss://broker.emqx.io:8084/mqtt' : 'ws://broker.emqx.io:8083/mqtt';
       mqttClient = mqtt.connect(brokerUrl, { keepalive: 30, reconnectPeriod: 2000 });
       mqttClient.on('connect', () => {
         nb.style.background = '#238636';
